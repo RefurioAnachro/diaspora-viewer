@@ -1,0 +1,127 @@
+<html>
+<head>
+  <title>Diaspora Archive</title>
+</head>
+<body>
+
+<h1>Diaspora Archive</h1>
+
+<div id="posts"></div>
+
+<style>
+img {
+    width: 500px;
+}
+</style>
+<script>
+/* USAGE:
+ * Put this on your webserver together with your export named diaspora_data.json
+ * and unzip your image export to a subdirectory images/
+ *
+ * WARNING: Your data export contains your private key which will allow an attacker
+ * to use federation to post under your name. You're STRONGLY ADVISED to remove it
+ * from your data export by taking out anything between these lines:
+ *
+ * -----BEGIN RSA PRIVATE KEY-----
+ * ...
+ * -----END RSA PRIVATE KEY-----
+ */
+function info(m) {
+    document.getElementById("posts").innerHTML = m;
+}
+function error(m) {
+    alert(m);
+}
+function make_xmlhttprequest() {
+    try {
+	var ret = new XMLHttpRequest();
+	if(ret.overrideMimeType)
+	    ret.overrideMimeType('text/html');
+	return ret;
+    }
+    catch (e) {}
+    try { return new ActiveXObject("Msxml2.XMLHTTP.6.0"); }
+    catch (e) {}
+    try { return new ActiveXObject("Msxml2.XMLHTTP.3.0"); }
+    catch (e) {}
+    try { return new ActiveXObject("Msxml2.XMLHTTP"); }
+    catch (e) {}
+    try { return new ActiveXObject("Microsoft.XMLHTTP"); }
+    catch (e) {}
+    error("XMLHTTPRequest not available");
+    return null;
+}
+function fetch_file(url, handler) {
+    info("fetching "+ url);
+    var c = make_xmlhttprequest();
+    if(!c)
+	return null;
+    c.onreadystatechange = function _handler(ev) {
+	switch(c.readyState) {
+	case 0: // UNSENT
+	case 1: // WAITING
+	case 2: // HEADERS
+	case 3: // LOADING
+	    return true;
+	case 4: // DONE
+	    if(c.status != 200)
+		error("got http code "+ c.status +" while fetching "+ url);
+	    if(c.status)
+		handler(c.responseText, c);
+	    else
+		handler(null, c);
+	    return true;
+	}
+    }
+    c.open("GET", url, true);
+//    c.withCredentials = true; // allow server to set cookies
+    c.send();
+    return true;
+}
+function format_text(text) {
+    return "<div>T"+ text +"</div>\n";
+}
+function format_photos(photos) {
+    var r = "";
+    for(var i in photos) {
+        src = "images/"+ photos[i].entity_data.remote_photo_name;
+        r += "<img src='"+ src +"'/>\n";
+    }
+    return r;
+}
+function format_post(post) {
+    var r = "";
+    switch(post.entity_type) {
+    case "status_message":
+        var d = post.entity_data;
+        r += format_text(d.text);
+        r += format_photos(d.photos);
+        break;
+    case "reshare":
+    default:
+        r += "<div>unknown entity type: "+ post.entity_type +"</div>\n";
+    }
+    return "<div>P"+ r +"</div>\n";
+}
+function render(data) {
+    var r = "";
+    for(i in data.user.posts)
+        r += format_post(data.user.posts[i]);
+    document.getElementById("posts").innerHTML = r;
+}
+function main() {
+    fetch_file("diaspora_data.json", function(text) {
+        try {
+            var data = JSON.parse(text);
+        }
+        catch(e) {
+            error(e.message);
+        }
+        console.log(data);
+        render(data);
+    });
+}
+main();
+</script>
+</body>
+</html>
